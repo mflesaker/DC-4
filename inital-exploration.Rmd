@@ -1,0 +1,162 @@
+---
+title: "inital-exploration"
+output: html_document
+---
+
+Plan:
+- Group by source IP address and time, summarize to get volume of communication 
+  - plot time vs. volume of communication with color = source IP address to look for spikes
+- Group by destination IP address and time, summarize to get volume of communication
+  - plot time vs. volume of communication with color = destination IP address to look for spikes
+
+
+Make graph: 
+
+"If you're thinking about going the network graph route you can think of each IP address as representing a specific computer. The source is where communication starts, and the destination is where it's headed, so that pair forms a directed edge in your graph."
+
+
+```{r, message = FALSE, warning = FALSE}
+## load necessary packages
+
+library(tidyverse)
+library(plotly)
+library(lubridate)
+```
+
+firewall_0406_original
+
+
+```{r, warning = FALSE, message = FALSE}
+## read CSV into R
+
+firewall_0406_original <- read_csv("Firewall-04062012.csv") 
+```
+
+```{r}
+## rename columns and parse date/time to aid analysis
+
+firewall_0406 <- firewall_0406_original %>%
+  mutate(date_time = dmy_hms(`Date/time`)) %>%
+  rename(syslog_priority = `Syslog priority`) %>%
+  rename(operation = Operation) %>%
+  rename(message_code = `Message code`) %>%
+  rename(protocol = Protocol) %>%
+  rename(source_IP = `Source IP`) %>%
+  rename(destination_IP = `Destination IP`) %>%
+  rename(source_hostname = `Source hostname`) %>%
+  rename(destination_hostname = `Destination hostname`) %>%
+  rename(source_port = `Source port`) %>%
+  rename(destination_port = `Destination port`) %>%
+  rename(destination_service = `Destination service`) %>%
+  rename(direction = Direction) %>%
+  rename(connections_built = `Connections built`) %>%
+  rename(connections_torn_down = `Connections torn down`)
+
+
+
+class(firewall_0406$date_time)
+```
+
+## Group by source IP address and time, summarize to get volume of communication 
+
+First, I grouped the data by hour and source_IP with the intention of plotting a line chart with time on the x axis and number of communications from the source as stated in my plan. The goal was to look for unusual spikes in activity. 
+
+```{r, message = FALSE, warning = FALSE}
+## grouping data by source and hour to look for spikes and patterns in the data; defining a new variable num_comms_from_IP that counts how many times the source computer sent a communcation
+
+firewall_0406 %>%
+  group_by(source_IP, hour(date_time)) %>%
+  summarize(
+    num_comms_from_IP = n()
+  ) %>%
+  rename(time = "hour(date_time)") %>%
+  arrange(desc(num_comms_from_IP))
+```
+
+Unfortunately, however, there seem to be far too many source IP addresses to plot each one individually on a line chart as I may have envisoned. As we can see below, there are 2990 different source IPs represented in the data set.
+
+```{r}
+## grouping data just by source IP to see how many source IP addresses there are over the data set; calculated number of communications initiated by that machine to identify outliers and sorted by that number of communications (descending) to identify possible machines that would be "spamming" otheer computers
+
+firewall_0406 %>%
+  group_by(source_IP) %>%
+  summarize(
+    n = n()
+  ) %>%
+  arrange(desc(n))
+```
+However, one computer -- 172.23.0.132 -- seems to be "spamming" everyone else. This machine is sending almost nine times as many communications as the next most frequently communicating machine. As a result, I'm going to filter the communications for only those sent by this IP address (and one other IP for reference) to look at this computer further. According to the data description, this IP address would belong to the "workstation" category, ie: "Individual computers located in offices or cubicles throughout Bank of Money"
+
+```{r, message = FALSE, warning = FALSE}
+fireewall_0406_suspicious_IP_for_graph <- firewall_0406 %>%
+  filter(source_IP == "172.23.0.132" | source_IP == "172.23.233.58") %>%
+  group_by(hour(date_time), source_IP) %>%
+  summarize(
+    num_comms_sent = n()
+  ) %>%
+  rename(time = "hour(date_time)") %>%
+  mutate(
+    source = ifelse(source_IP == "172.23.233.58", "172.23.233.58 (reference)", "172.23.0.132 (suspicious)")
+  )
+```
+
+```{r}
+suspicious_IP_comms <- ggplot(fireewall_0406_suspicious_IP_for_graph, aes(x = time, y = num_comms_sent, color = source)) +
+  geom_line() + 
+  scale_color_brewer(palette = "Set1") +
+  scale_x_continuous(name = "Time on 04/06 (by hour)") +
+  scale_y_continuous(name = "Number of Communications Sent") +
+  ggtitle("Communications sent by IP address 172.23.0.132 on 04/06") +
+  theme(panel.grid = element_blank(), panel.background = element_rect(fill = "white"), axis.line = element_line(color = "black")) +
+  
+  ## -------------------------------------------------------
+
+  ## Color reference from https://colorbrewer2.org/#type=qualitative&scheme=Set1&n=6 & http://applied-r.com/rcolorbrewer-palettes/
+  
+  ## Annotate idea and syntax from http://www.sthda.com/english/wiki/ggplot2-texts-add-text-annotations-to-a-graph-in-r-software
+  
+  annotate(geom = "text", x = 6, y = 1200, label = "In blue:", color = "#377eb8", size = 2.5) +
+  annotate(geom = "text", x = 6, y = 1000, label = "next most frequently", color = "#377eb8", size = 2.5) +
+  annotate(geom = "text", x = 6, y = 800, label = "communicating IP address", color = "#377eb8", size = 2.5)
+
+## ------------------------------------------------------
+  
+
+ggplotly(suspicious_IP_comms)
+```
+
+While looking at the communications by time does not necessarily elucdiate any further patterns, we can look at to whom this IP address is communicating.
+
+```{r}
+firewall_0406 %>%
+  filter(source_IP == "172.23.0.132") %>%
+  group_by(source_IP, destination_IP) %>%
+  summarize(
+    num_comms_sent = n()
+  ) %>%
+  arrange(desc(num_comms_sent))
+```
+
+The majority of these communications seem to be going to the IP address 10.32.0.100, which is the "Corporate Headquarters DataCenter firewall interface to the Internet." The rest of the IP addresses are websites 
+
+## Group by destination IP address and time, summarize to get volume of communication 
+
+```{r, message = FALSE, warning = FALSE}
+firewall_0406 %>%
+  group_by(destination_IP) %>%
+  summarize(
+    n = n()
+  ) %>%
+  arrange(desc(n))
+```
+
+
+
+
+
+
+
+
+
+
+
