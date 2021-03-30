@@ -3,18 +3,6 @@ title: "inital-exploration"
 output: html_document
 ---
 
-Plan:
-- Group by source IP address and time, summarize to get volume of communication 
-  - plot time vs. volume of communication with color = source IP address to look for spikes
-- Group by destination IP address and time, summarize to get volume of communication
-  - plot time vs. volume of communication with color = destination IP address to look for spikes
-
-
-Make graph: 
-
-"If you're thinking about going the network graph route you can think of each IP address as representing a specific computer. The source is where communication starts, and the destination is where it's headed, so that pair forms a directed edge in your graph."
-
-
 ```{r, message = FALSE, warning = FALSE}
 ## load necessary packages
 
@@ -22,9 +10,6 @@ library(tidyverse)
 library(plotly)
 library(lubridate)
 ```
-
-firewall_0406_original
-
 
 ```{r, warning = FALSE, message = FALSE}
 ## read CSV into R
@@ -51,15 +36,13 @@ firewall_0406 <- firewall_0406_original %>%
   rename(direction = Direction) %>%
   rename(connections_built = `Connections built`) %>%
   rename(connections_torn_down = `Connections torn down`)
-
-
-
-class(firewall_0406$date_time)
 ```
+
+# April 6 Data
 
 ## Group by source IP address and time, summarize to get volume of communication 
 
-First, I grouped the data by hour and source_IP with the intention of plotting a line chart with time on the x axis and number of communications from the source as stated in my plan. The goal was to look for unusual spikes in activity. 
+First, I grouped the data by hour and source_IP with the intention of plotting a line chart with time on the x axis and number of communications from the source on the y axis. The goal was to look for unusual spikes in activity. 
 
 ```{r, message = FALSE, warning = FALSE}
 ## grouping data by source and hour to look for spikes and patterns in the data; defining a new variable num_comms_from_IP that counts how many times the source computer sent a communcation
@@ -81,43 +64,38 @@ Unfortunately, however, there seem to be far too many source IP addresses to plo
 firewall_0406 %>%
   group_by(source_IP) %>%
   summarize(
-    n = n()
+    num_comms_from_IP = n()
   ) %>%
-  arrange(desc(n))
+  arrange(desc(num_comms_from_IP))
 ```
-However, one computer -- 172.23.0.132 -- seems to be "spamming" everyone else. This machine is sending almost nine times as many communications as the next most frequently communicating machine. As a result, I'm going to filter the communications for only those sent by this IP address (and one other IP for reference) to look at this computer further. According to the data description, this IP address would belong to the "workstation" category, ie: "Individual computers located in offices or cubicles throughout Bank of Money"
+However, one computer -- 172.23.0.132 -- seems to be "spamming" everyone else. This machine is sending almost nine times as many communications as the next most frequently communicating machine.    
 
 ```{r, message = FALSE, warning = FALSE}
 fireewall_0406_suspicious_IP_for_graph <- firewall_0406 %>%
-  filter(source_IP == "172.23.0.132" | source_IP == "172.23.233.58") %>%
+  filter(source_IP %in% c("172.23.0.132", "172.23.233.58", "172.23.233.50",  "172.23.232.255", "172.23.233.59", "172.23.233.53", "172.23.233.51", "172.23.235.58")) %>%
   group_by(hour(date_time), source_IP) %>%
   summarize(
     num_comms_sent = n()
   ) %>%
-  rename(time = "hour(date_time)") %>%
-  mutate(
-    source = ifelse(source_IP == "172.23.233.58", "172.23.233.58 (reference)", "172.23.0.132 (suspicious)")
-  )
+  rename(time = "hour(date_time)")
 ```
 
 ```{r}
-suspicious_IP_comms <- ggplot(fireewall_0406_suspicious_IP_for_graph, aes(x = time, y = num_comms_sent, color = source)) +
+suspicious_IP_comms <- ggplot(fireewall_0406_suspicious_IP_for_graph, aes(x = time, y = num_comms_sent, color = source_IP)) +
   geom_line() + 
   scale_color_brewer(palette = "Set1") +
   scale_x_continuous(name = "Time on 04/06 (by hour)") +
   scale_y_continuous(name = "Number of Communications Sent") +
-  ggtitle("Communications sent by IP address 172.23.0.132 on 04/06") +
+  ggtitle("Aggregated communications sent by 172.23.0.132 on 04/06") +
   theme(panel.grid = element_blank(), panel.background = element_rect(fill = "white"), axis.line = element_line(color = "black")) +
   
   ## -------------------------------------------------------
-
-  ## Color reference from https://colorbrewer2.org/#type=qualitative&scheme=Set1&n=6 & http://applied-r.com/rcolorbrewer-palettes/
   
   ## Annotate idea and syntax from http://www.sthda.com/english/wiki/ggplot2-texts-add-text-annotations-to-a-graph-in-r-software
   
-  annotate(geom = "text", x = 6, y = 1200, label = "In blue:", color = "#377eb8", size = 2.5) +
-  annotate(geom = "text", x = 6, y = 1000, label = "next most frequently", color = "#377eb8", size = 2.5) +
-  annotate(geom = "text", x = 6, y = 800, label = "communicating IP address", color = "#377eb8", size = 2.5)
+  annotate(geom = "text", x = 6, y = 1200, label = "Below this text:", color = "black", size = 2.5) +
+  annotate(geom = "text", x = 6, y = 1000, label = "next 7 most frequently", color = "black", size = 2.5) +
+  annotate(geom = "text", x = 6, y = 800, label = "communicating IP address", color = "black", size = 2.5)
 
 ## ------------------------------------------------------
   
@@ -128,26 +106,380 @@ ggplotly(suspicious_IP_comms)
 While looking at the communications by time does not necessarily elucdiate any further patterns, we can look at to whom this IP address is communicating.
 
 ```{r}
-firewall_0406 %>%
+suspicious_IP_by_dest <- firewall_0406 %>%
   filter(source_IP == "172.23.0.132") %>%
   group_by(source_IP, destination_IP) %>%
   summarize(
     num_comms_sent = n()
-  ) %>%
-  arrange(desc(num_comms_sent))
+  )
+
+ggplot(suspicious_IP_by_dest, aes(x = num_comms_sent, y = destination_IP)) +
+  geom_col()
 ```
 
-The majority of these communications seem to be going to the IP address 10.32.0.100, which is the "Corporate Headquarters DataCenter firewall interface to the Internet." The rest of the IP addresses are websites 
+The majority of these communications seem to be going to the IP address 10.32.0.100, which is the "Corporate Headquarters DataCenter firewall interface to the Internet." The rest of the IP addresses are websites on the internet. 
+
+```{r, message = FALSE, warning = FALSE}
+suspicious_IP_by_dest_and_time <- firewall_0406 %>%
+  filter(source_IP == "172.23.0.132") %>%
+  group_by(source_IP, destination_IP, hour(date_time)) %>%
+  summarize(
+    num_comms_sent = n()
+  ) %>%
+  rename(time = "hour(date_time)")
+
+suspicious_IP_comms_by_dest <- ggplot(suspicious_IP_by_dest_and_time, aes(x = time, y = num_comms_sent, color = destination_IP)) +
+  geom_line() +
+   ## palette idea from: https://www.datanovia.com/en/blog/the-a-z-of-rcolorbrewer-palette/
+  scale_color_brewer(palette = "Set3") +
+  scale_x_continuous(name = "Time on 04/06 (by hour)") +
+  scale_y_continuous(name = "Number of Communications Sent") +
+  ggtitle("Communications sent by IP address 172.23.0.132 on 04/06") +
+  ## labs syntax from https://www.datanovia.com/en/blog/ggplot-legend-title-position-and-labels/
+  labs(color = "Destination IP Address") +
+  theme(panel.grid = element_blank(), panel.background = element_rect(fill = "white"), axis.line = element_line(color = "black"))
+
+ggplotly(suspicious_IP_comms_by_dest)
+```
+Communications from 172.23.0.32 to 10.32.0.100 have a very different pattern and frequency when compared to communications to other IP addresses. 
+
+```{r}
+firewall_0406 %>%
+  filter(source_IP == "172.23.0.132") %>%
+  group_by(destination_IP, destination_port) %>%
+  summarize(
+    num_comms = n()
+  ) %>%
+  arrange(desc(num_comms))
+```
 
 ## Group by destination IP address and time, summarize to get volume of communication 
 
 ```{r, message = FALSE, warning = FALSE}
 firewall_0406 %>%
+  group_by(destination_IP, hour(date_time)) %>%
+  summarize(
+    n = n()
+  ) %>%
+  arrange(desc(n))
+```
+# April 7
+
+```{r, warning = FALSE, message = FALSE}
+## read CSV into R
+
+firewall_0407_original <- read_csv("Firewall-04072012.csv") 
+```
+
+```{r}
+## rename columns and parse date/time to aid analysis
+
+firewall_0407 <- firewall_0407_original %>%
+  mutate(date_time = dmy_hms(`Date/time`)) %>%
+  rename(syslog_priority = `Syslog priority`) %>%
+  rename(operation = Operation) %>%
+  rename(message_code = `Message code`) %>%
+  rename(protocol = Protocol) %>%
+  rename(source_IP = `Source IP`) %>%
+  rename(destination_IP = `Destination IP`) %>%
+  rename(source_hostname = `Source hostname`) %>%
+  rename(destination_hostname = `Destination hostname`) %>%
+  rename(source_port = `Source port`) %>%
+  rename(destination_port = `Destination port`) %>%
+  rename(destination_service = `Destination service`) %>%
+  rename(direction = Direction) %>%
+  rename(connections_built = `Connections built`) %>%
+  rename(connections_torn_down = `Connections torn down`)
+```
+
+```{r}
+firewall_0407 %>%
+  group_by(source_IP, hour(date_time)) %>%
+  summarize(
+    num_comms_from_IP = n()
+  ) %>%
+  rename(time = "hour(date_time)") %>%
+  arrange(desc(num_comms_from_IP))
+```
+
+```{r}
+firewall_0407 %>%
+  group_by(source_IP)%>%
+  summarize(
+    num_comms_from_IP = n()
+  ) %>%
+  arrange(desc(num_comms_from_IP))
+```
+While 172.23.0.132, the identified suspicious machine from the April 6th data, remains a frequently communicating source here, another individual workstation computer, 172.23.252.10 
+
+```{r, message = FALSE, warning = FALSE}
+firewall_0406 %>%
+  filter(source_IP == "172.23.252.10")
+```
+
+This computer is not found in the 4/6 data.
+
+I'm going to look at this data by time
+
+```{r, message = FALSE, warning = FALSE}
+fireewall_0407_suspicious_IP_for_graph <- firewall_0407 %>%
+  filter(source_IP %in% c("172.23.252.10", "172.23.0.132", "172.23.232.253",  "172.23.232.252", "172.23.232.9", "172.23.233.36", "172.23.235.53", "172.23.233.33")) %>%
+  group_by(hour(date_time), source_IP) %>%
+  summarize(
+    num_comms_sent = n()
+  ) %>%
+  rename(time = "hour(date_time)")
+```
+
+```{r}
+suspicious_IP_comms07 <- ggplot(fireewall_0407_suspicious_IP_for_graph, aes(x = time, y = num_comms_sent, color = source_IP)) +
+  geom_line() + 
+  scale_color_brewer(palette = "Set1") +
+  scale_x_continuous(name = "Time on 04/07 (by hour)") +
+  scale_y_continuous(name = "Number of Communications Sent") +
+  ggtitle("172.23.0.132 and 172.23.252.10 on 04/07") +
+  theme(panel.grid = element_blank(), panel.background = element_rect(fill = "white"), axis.line = element_line(color = "black")) +
+  labs(caption = "Next 6 most frequently communicating IP addresses added for reference")
+  
+
+ggplotly(suspicious_IP_comms07)
+```
+```{r, message = FALSE, warning = FALSE}
+suspicious_IP_by_dest_and_time132 <- firewall_0407 %>%
+  filter(source_IP == "172.23.0.132") %>%
+  group_by(source_IP, destination_IP, hour(date_time)) %>%
+  summarize(
+    num_comms_sent = n()
+  ) %>%
+  rename(time = "hour(date_time)")
+
+suspicious_IP_comms_by_dest132 <- ggplot(suspicious_IP_by_dest_and_time132, aes(x = time, y = num_comms_sent, color = destination_IP)) +
+  geom_line() +
+   ## palette idea from: https://www.datanovia.com/en/blog/the-a-z-of-rcolorbrewer-palette/
+  scale_color_brewer(palette = "Set3") +
+  scale_x_continuous(name = "Time on 04/07 (by hour)") +
+  scale_y_continuous(name = "Number of Communications Sent") +
+  ggtitle("Communications sent by 172.23.0.132 on 04/07") +
+  ## labs syntax from https://www.datanovia.com/en/blog/ggplot-legend-title-position-and-labels/
+  labs(color = "Destination IP Address") +
+  theme(panel.grid = element_blank(), panel.background = element_rect(fill = "white"), axis.line = element_line(color = "black"))
+
+ggplotly(suspicious_IP_comms_by_dest132)
+```
+
+
+```{r}
+firewall_0407 %>%
+  filter(source_IP == "172.23.0.132") %>%
+  group_by(destination_IP, destination_port) %>%
+  summarize(
+    num_comms = n()
+  ) %>%
+  arrange(desc(num_comms))
+```
+
+
+```{r, message = FALSE, warning = FALSE}
+suspicious_IP_by_dest_and_time10 <- firewall_0407 %>%
+  filter(source_IP == "172.23.252.10") %>%
+  group_by(source_IP, destination_IP, hour(date_time)) %>%
+  summarize(
+    num_comms_sent = n()
+  ) %>%
+  rename(time = "hour(date_time)")
+
+suspicious_IP_comms_by_dest10 <- ggplot(suspicious_IP_by_dest_and_time10, aes(x = time, y = num_comms_sent, color = destination_IP)) +
+  geom_line() +
+   ## palette idea from: https://www.datanovia.com/en/blog/the-a-z-of-rcolorbrewer-palette/
+  scale_color_brewer(palette = "Set3") +
+  scale_x_continuous(name = "Time on 04/07 (by hour)") +
+  scale_y_continuous(name = "Number of Communications Sent") +
+  ggtitle("Communications sent by 172.23.252.10 on 04/07") +
+  ## labs syntax from https://www.datanovia.com/en/blog/ggplot-legend-title-position-and-labels/
+  labs(color = "Destination IP Address") +
+  theme(panel.grid = element_blank(), panel.background = element_rect(fill = "white"), axis.line = element_line(color = "black"))
+
+ggplotly(suspicious_IP_comms_by_dest10)
+```
+```{r}
+suspicious_IP_by_dest_and_time10p2 <- firewall_0407 %>%
+  filter(source_IP == "172.23.252.10") %>%
+  group_by(source_IP, destination_IP, hour(date_time), destination_port) %>%
+  summarize(
+    num_comms_sent = n()
+  ) %>%
+  rename(time = "hour(date_time)")
+
+suspicious_IP_comms_by_dest10p2 <- ggplot(suspicious_IP_by_dest_and_time10p2, aes(x = time, y = num_comms_sent, color = destination_port)) +
+  geom_line() +
+   ## palette idea from: https://www.datanovia.com/en/blog/the-a-z-of-rcolorbrewer-palette/
+  scale_color_brewer(palette = "Set2") +
+  scale_x_continuous(name = "Time on 04/07 (by hour)") +
+  scale_y_continuous(name = "Number of Communications Sent") +
+  ggtitle("Communications sent by 172.23.252.10 on 04/07") +
+  ## labs syntax from https://www.datanovia.com/en/blog/ggplot-legend-title-position-and-labels/
+  labs(color = "Destination \n Port") +
+  theme(panel.grid = element_blank(), panel.background = element_rect(fill = "white"), axis.line = element_line(color = "black"))
+
+ggplotly(suspicious_IP_comms_by_dest10p2)
+```
+
+
+
+```{r}
+firewall_0407 %>%
+  filter(source_IP == "172.23.252.10") %>%
+  group_by(destination_IP, destination_port) %>%
+  summarize(
+    num_comms = n()
+  ) %>%
+  arrange(desc(num_comms))
+```
+
+```{r}
+firewall_0407 %>%
+  filter(source_IP == "172.23.0.132") %>%
+  group_by(destination_IP, destination_port) %>%
+  summarize(
+    num_comms = n()
+  ) %>%
+  arrange(desc(num_comms))
+```
+
+## Group by destination IP address and time, summarize to get volume of communication 
+
+```{r, message = FALSE, warning = FALSE}
+firewall_0407 %>%
   group_by(destination_IP) %>%
   summarize(
     n = n()
   ) %>%
   arrange(desc(n))
+```
+This data set shows a similar pattern to the data from 4/6; 10.32.0.100 has by far the most frequent communications, followed by other IP addresses in 10.32.x.xx.
+
+
+
+```{r, message = FALSE, warning = FALSE}
+dest_port1 <- firewall_0406 %>%
+  filter(destination_port == 6667) %>%
+  group_by(source_IP) %>%
+  summarize(
+    num_comms_sent = n()
+  ) %>%
+  arrange(desc(num_comms_sent))
+
+dest_port1_by_time <- firewall_0406 %>%
+  filter(destination_port == 6667) %>%
+  group_by(source_IP, hour(date_time)) %>%
+  summarize(
+    num_comms_sent = n()
+  ) %>%
+  arrange(desc(num_comms_sent))
+
+dest_port2 <- firewall_0407 %>%
+  filter(destination_port == 6667) %>%
+  group_by(source_IP) %>%
+  summarize(
+    num_comms_sent = n()
+  ) %>%
+  arrange(desc(num_comms_sent)) %>%
+  filter(num_comms_sent > 4626)
+
+dest_port2_by_time <- firewall_0407 %>%
+  filter(destination_port == 6667) %>%
+  group_by(source_IP, hour(date_time)) %>%
+  summarize(
+    num_comms_sent = n()
+  ) %>%
+  arrange(desc(num_comms_sent))
+
+ggplot(dest_port2, aes(x = num_comms_sent, y = source_IP)) +
+  geom_col() +
+  scale_x_continuous(name = "Number of Communications to Destination Port 6667", limits = c(0,50000)) +
+  scale_y_discrete(name = "Source IP (top 10 with comms to destination port 6667)") +
+  ggtitle("Top Source IPs with Communications to Dest. Port 6667 on 4/7") +
+  ## labs syntax from https://www.datanovia.com/en/blog/ggplot-legend-title-position-and-labels/
+  theme(panel.grid = element_blank(), panel.background = element_rect(fill = "white"), axis.line = element_line(color = "black"))
+
+  
+```
+
+```{r}
+dest_port2_by_time_twoIP <- firewall_0407 %>%
+  filter(destination_port == 6667) %>%
+  filter(source_IP == "172.23.252.10" | source_IP == "172.23.0.108" | source_IP == "172.23.1.168" | source_IP == "172.23.134.76" | source_IP == "172.23.134.214" | source_IP == "172.23.134.218" | source_IP == "172.23.134.78") %>%
+  group_by(source_IP, hour(date_time)) %>%
+  summarize(
+    num_comms_sent = n()
+  ) %>%
+  arrange(desc(num_comms_sent)) %>%
+  rename(time = "hour(date_time)")
+
+dest_port_by_IP2 <- ggplot(dest_port2_by_time_twoIP, aes(x = time, y = num_comms_sent, color = source_IP)) +
+  geom_line() +
+  scale_color_brewer(palette = "Set1") +
+  scale_x_continuous(name = "Time on 04/07 (by hour)") +
+  scale_y_continuous(name = "Number of Communications Sent to Port 6667") +
+  ggtitle("Communications sent to Dest. Port 6667 on 04/07") +
+  ## labs syntax from https://www.datanovia.com/en/blog/ggplot-legend-title-position-and-labels/
+  labs(color = "Source IP") +
+  theme(panel.grid = element_blank(), panel.background = element_rect(fill = "white"), axis.line = element_line(color = "black")) +
+   ## Annotate idea and syntax from http://www.sthda.com/english/wiki/ggplot2-texts-add-text-annotations-to-a-graph-in-r-software
+  
+  annotate(geom = "text", x = 6, y = 800, label = "Below this text:", color = "black", size = 2.5) +
+  annotate(geom = "text", x = 6, y = 700, label = "next 5 source IP addresses with greatest", color = "black", size = 2.5) +
+  annotate(geom = "text", x = 6, y = 600, label = "communication in any single hour to port 6667", color = "black", size = 2.5) +
+  annotate(geom = "text", x = 6, y = 500, label = "for reference", color = "black", size = 2.5)
+
+## ------------------------------------------------------
+
+ggplotly(dest_port_by_IP2)
+```
+
+```{r}
+firewall_0406 %>%
+  filter(source_IP == "172.23.0.108") %>%
+  group_by(destination_port) %>%
+  summarize(
+    num_comms = n()
+  )
+
+firewall_0407 %>%
+  filter(source_IP == "172.23.0.108") %>%
+  group_by(destination_port) %>%
+  summarize(
+    num_comms = n()
+  )
+
+firewall_0407 %>%
+  filter(source_IP == "172.23.0.108") %>%
+  group_by(destination_port, destination_IP) %>%
+  summarize(
+    num_comms = n()
+  )
+
+suspicious_IP3 <- firewall_0407 %>%
+  filter(source_IP == "172.23.0.108") %>%
+  group_by(destination_port, destination_IP, hour(date_time)) %>%
+  summarize(
+    num_comms = n()
+  ) %>%
+  rename(time = "hour(date_time)")
+
+plot <- ggplot(suspicious_IP3, aes(x = time, y = num_comms, color = destination_IP)) +
+  geom_line() +
+  facet_wrap(~destination_port, labeller = "label_both") +
+  scale_color_brewer(palette = "Set1") +
+  scale_x_continuous(name = "Time on 04/07 (by hour)") +
+  scale_y_continuous(name = "Number of Communications Sent to Destination Port") +
+  ggtitle("Communications sent by 172.23.0.108 04/07") +
+  ## labs syntax from https://www.datanovia.com/en/blog/ggplot-legend-title-position-and-labels/
+  labs(color = "Destination IP") +
+  theme(panel.grid = element_blank(), panel.background = element_rect(fill = "white"), axis.line = element_line(color = "black"))
+  
+
+ggplotly(plot)
 ```
 
 
