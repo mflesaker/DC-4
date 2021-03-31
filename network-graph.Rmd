@@ -77,7 +77,32 @@ rglplot(graph, vertex.size=4, vertex.label.dist=0.5, vertex.color="red", edge.ar
 ## ------------------------
 ```
 
+```{r}
+edges_mostsuspicious_IP <- firewall_0407_original %>%
+  rename(from = `Source IP`) %>%
+  rename(to = `Destination IP`) %>%
+  rename(destination_port = `Destination port`) %>%
+  select(from, to, destination_port) %>%
+  filter(from == "172.23.252.10" | to == "172.23.252.10")
 
+samp_edges_suspicious_IP <- edges[sample(nrow(edges_mostsuspicious_IP), 1000), ]
+```
+
+
+```{r}
+graph2 <- graph_from_data_frame(samp_edges_suspicious_IP, directed = TRUE, vertices = NULL)
+
+## the following code is copied and pasted directly from user jac on 7/25/16 https://stackoverflow.com/questions/38573984/igraph-in-r-how-to-change-edge-color-based-on-edge-attribute
+
+E(graph2)$color <- as.factor(samp_edges_suspicious_IP$destination_port)
+
+## -------------------------------------
+```
+
+
+```{r}
+rglplot(graph2, vertex.size=4, vertex.label.dist=0.5, vertex.color="red", edge.arrow.size=0.5)
+```
 
 
 
