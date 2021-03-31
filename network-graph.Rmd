@@ -1,0 +1,84 @@
+---
+title: "network-graph"
+output: html_document
+---
+
+```{r, message = FALSE, warning = FALSE}
+library(tidyverse)
+library(igraph)
+library(networkD3)
+library(plotly)
+library(igraph)
+library(igraphdata)
+```
+
+```{r}
+firewall_0407_original <- read_csv("Firewall-04072012.csv") 
+```
+
+```{r, message = FALSE, warning = FALSE}
+## https://tidygraph.data-imaginist.com/ and
+## https://www.data-imaginist.com/2017/introducing-tidygraph/ for from/to syntax and structuring of edges and nodes
+
+edges <- firewall_0407_original %>%
+  rename(from = `Source IP`) %>%
+  rename(to = `Destination IP`) %>%
+  rename(destination_port = `Destination port`) %>%
+  select(from, to, destination_port)
+
+nodes <- firewall_0407_original %>%
+  rename(from = `Source IP`) %>%
+  rename(to = `Destination IP`) %>%
+  select(from, to)%>%
+  pivot_longer(names_to = "type", values_to = "IP", cols = c(from, to)) %>%
+  select(-type) %>%
+  
+  ## distinct function and syntax from https://www.datanovia.com/en/lessons/identify-and-remove-duplicate-data-in-r/
+    distinct(IP)
+#-----
+```
+
+```{r, message = FALSE, warning = FALSE}
+## code for sample directly copied from user John Colby on 11/25/11 https://stackoverflow.com/questions/8273313/sample-random-rows-in-dataframe
+
+samp_edges <- edges[sample(nrow(edges), 1000), ]
+
+## --------------------------------------------------------
+```
+
+fixed issues with: https://planspace.org/2013/01/17/fix-r-tcltk-dependency-problem-on-mac/ https://www.xquartz.org/ and https://cran.r-project.org/bin/macosx/tools/
+
+```{r}
+
+## https://kateto.net/netscix2016.html
+# https://igraph.org/r/doc/graph_from_data_frame.html ---------------
+
+graph <- graph_from_data_frame(samp_edges, directed = TRUE, vertices = NULL)
+
+## -------------------------------------------------------------
+
+## the following code is copied and pasted directly from user jac on 7/25/16 https://stackoverflow.com/questions/38573984/igraph-in-r-how-to-change-edge-color-based-on-edge-attribute
+
+E(graph)$color <- as.factor(samp_edges$destination_port)
+
+## -------------------------------------
+
+## this code is directly copied and pasted from R Documentation - Drawing graphs {igraph} and https://igraph.org/r/doc/tkplot.html
+
+tkplot(graph, canvas.width = 1000, canvas.height = 1000, vertex.size=4,
+     vertex.label.dist=0.5, vertex.color="red", edge.arrow.size=0.5)
+
+## ------------------------------------------------------------
+
+## this code is directly copied and pasted from R Documentation - Drawing graphs {igraph}
+
+rglplot(graph, vertex.size=4, vertex.label.dist=0.5, vertex.color="red", edge.arrow.size=0.5)
+
+## ------------------------
+```
+
+
+
+
+
+
