@@ -1,0 +1,177 @@
+---
+title: "IDS_analysis"
+author: "Lily Diao"
+date: "3/28/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(plotly)
+library(lubridate)
+library(ggplot2)
+```
+
+
+```{r}
+IDS<-read.csv("IDS-0406-updated.csv")
+```
+
+Because the IDS data represents the incidents of intrusion, we are interested in the destination IPs that receive a large amount of intrusion alerts
+
+# DestinationIP Receiving a Large Amount of Alerts
+
+```{r}
+IDS_destination_max<-IDS %>% 
+  group_by(destIP) %>% 
+  summarise(count_alert=n()) %>% 
+  arrange(desc(count_alert))
+head(IDS_destination_max, 5)
+```
+
+We identified IP 172.23.0.10 (Domain controller / DNS) and 172.23.0.1 (Firewall interface to regional bank network) have more alerts compared to other IPs. It seems that the domain controller, which responses to authentication requests and verrifies users on computer network, and the Firewall interface to regional bank network are under intrusions. 
+
+# SourceIPs for the Two Destinations
+
+We then looked at the source IP that causes alerts in 172.23.0.10 and 172.23.0.1.
+
+```{r}
+IDS_source_suspicious<-IDS %>% 
+  filter(destIP == "172.23.0.10" | destIP == "172.23.0.1") %>% 
+  group_by(sourceIP, destIP) %>% 
+  summarize(
+    count_source_alert = n()
+  ) %>% 
+  arrange(desc(count_source_alert)) 
+head(IDS_source_suspicious, 5)
+
+```
+
+```{r}
+# This is not the best visualization to show, I'm changing it later
+ggplot(IDS_source_suspicious, aes(x = count_source_alert, y = sourceIP))+
+  geom_col() +
+  facet_wrap(~ destIP)
+```
+
+We identified that sourceIP 172.23.5.110 causes the largest amount of alerts on the domain controller, followed by 88 other IPs. IP 172.23.231.69  causes the largest amount of alerts for the domain firewall, followed by four other IPs. 
+
+# Content of the Alerts for the Two IPs (not significant)
+
+We also want to know the content of the alerts. 
+
+```{r}
+unique_alert_firewall<-IDS %>% 
+  filter(destIP == "172.23.0.1") %>% 
+  group_by(label) %>% 
+  summarise(count_alert_firewall=n()) %>% 
+  arrange(desc(count_alert_firewall)) 
+head(unique_alert_firewall, 5)
+
+```
+
+```{r}
+unique_alert_domain<-IDS %>% 
+  filter(destIP == "172.23.0.10") %>% 
+  group_by(label) %>% 
+  summarise(count_alert_domain=n()) %>% 
+  arrange(desc(count_alert_domain)) 
+head(unique_alert_domain, 5)
+```
+
+```{r}
+port_of_alert<-IDS %>% 
+  filter(destIP == "172.23.0.10") %>% 
+  group_by(destPort) %>% 
+  summarise(port_count=n())
+```
+
+
+# Priority of Ports
+
+Since we learned that priority 1 alerts are the most major ones, we filtered out these specific alerts. 
+
+```{r}
+priority_top<-IDS %>% 
+  filter(priority == 1) 
+priority_top 
+```
+
+```{r}
+priority_of_alert<-IDS %>% 
+  filter(priority == 1) %>% 
+  group_by(time) %>% 
+  summarise(count=n())
+priority_of_alert
+```
+
+We realized that the alerts are all from sourcePort 1026 and 1027. We then creat a time line showing how the alert change overtime. 
+
+```{r}
+IDS_time<-IDS %>% 
+   mutate(date_time = hour(time)) %>% 
+  group_by(date_time)
+```
+
+```{r}
+time_priority1 <- priority_of_alert %>%
+  plot_ly(x = ~time, y = ~count) %>%
+  add_lines(alpha = 0.4) 
+time_priority1
+```
+
+# Identifying the Possible Explaination for IP 172.23.5.110 and 172.23.0.237 on Domain Control
+
+
+We have previously identified that 172.23.5.110 causes the largest amount of alert for domain control followed by 172.23.0.237, which are both workstations. We want to track down the amount of alert it send through time.
+
+```{r}
+# filtering for sourceIP 172.23.5.110 and domain control
+alert_domain_control<-IDS %>% 
+  filter(destIP == "172.23.0.10" & (sourceIP=="172.23.5.110"|sourceIP == "172.23.0.237")) %>% 
+  mutate(date_time=mdy_hm(time)) %>% 
+  group_by(date_time, sourceIP) %>% 
+  summarise(count=n())
+```
+
+```{r}
+# creating a time(min) versus count graph
+graph_domain_control <- ggplot(alert_domain_control, aes(x = date_time, y = count, color = sourceIP)) +
+  geom_line()+
+  ggtitle("Communications sent by IP address 1172.23.5.110 on 172.23.0.237") +
+  labs(x="Time (by minute)", y="Number of Communications Sent", color = "SourceIP") 
+graph_domain_control
+ggplotly(graph_domain_control)
+```
+
+From the graph, we are able to see from April 05 12:00 to April 06 12:00, both the two IDs generate consecutive alterts to domain control. The alerts are 12 minutes apart for 172.23.5.110 and about two hours apart for 172.23.0.237. To understand more about these alerts, we look back to the IDS log and arrange the data according to priority. 
+
+```{r}
+alert_domain_content<-IDS %>% 
+  filter(destIP == "172.23.0.10" & (sourceIP=="172.23.5.110"|sourceIP == "172.23.0.237")) %>% 
+  arrange(priority) %>% 
+  select(time, sourceIP, sourcePort, destIP, destPort, classification, priority, xref)
+head(alert_domain_content)
+```
+
+We can see that sourceIP 172.23.5.110 causes a Potential Corporate Privacy Violation, which is priority 1,  all at 4/5/2012 18:06. The destPort of the alert is 53, which is the domain name service (DNS), which is responsible for converting domain names to IP addresses. We think that sourceIP 172.23.5.110 could be a cooperate workstation being hacked by virus which causes it to send a massive amount of information. The search of sourcePort 1026 online (https://www.speedguide.net/port.php?port=1026) indicate that it is responsible for sending MS Messenger spam which confirms our hypothesis that workstation 172.23.5.110 is turned into a spamming tool.
+
+```{r}
+domain_control <- alert_domain_control %>%
+  plot_ly(x = ~time, y = ~count) %>%
+  add_lines(alpha = 0.4) 
+domain_control
+```
+
+```{r}
+domain_control<-IDS %>% 
+  
+
+```
+
+```{r}
+alert_domain_control<-IDS %>% 
+  filter(destIP == "172.23.0.10" & sourceIP == "172.23.0.237")
+```
+
