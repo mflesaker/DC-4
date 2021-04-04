@@ -483,6 +483,15 @@ ggplotly(plot)
 ```
 
 
+```{r}
+firewall_0407 %>%
+  filter(source_IP == "172.23.252.10") %>%
+  group_by(hour(date_time), minute(date_time)) %>%
+  arrange(date_time)
+```
+
+
+
 
 
 

@@ -15,7 +15,7 @@ library(ggplot2)
 
 
 ```{r}
-IDS<-read.csv("IDS-0406-updated.csv")
+IDS<-read_csv("IDS-0406-updated.csv")
 ```
 
 Because the IDS data represents the incidents of intrusion, we are interested in the destination IPs that receive a large amount of intrusion alerts
@@ -164,14 +164,28 @@ domain_control <- alert_domain_control %>%
 domain_control
 ```
 
-```{r}
-domain_control<-IDS %>% 
-  
-
-```
 
 ```{r}
 alert_domain_control<-IDS %>% 
   filter(destIP == "172.23.0.10" & sourceIP == "172.23.0.237")
 ```
+
+
+### checking for michelle's three IPS
+
+```{r}
+IDS %>%
+  filter(sourceIP == "172.23.0.108" | sourceIP == "172.23.252.10" | sourceIP == "172.23.0.132")
+```
+
+```{r}
+ids0407 <- read_csv("IDS-0407.csv")
+
+ids0407 %>%  
+  filter(sourceIP == "172.23.0.108" | sourceIP == "172.23.252.10" | sourceIP == "172.23.0.132")
+```
+
+
+
+
 
