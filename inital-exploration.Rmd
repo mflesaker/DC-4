@@ -484,14 +484,96 @@ ggplotly(plot)
 
 
 ```{r}
-firewall_0407 %>%
-  filter(source_IP == "172.23.252.10") %>%
+firewall_0406 %>%
+  filter(source_IP == "172.23.5.110") %>%
   group_by(hour(date_time), minute(date_time)) %>%
   arrange(date_time)
 ```
 
+## summary statistics
+
+### destination IP
 
 
+```{r}
+library(scales)
+```
+
+```{r}
+firewall_0406 %>%
+  group_by(destination_IP) %>%
+  summarize(
+    num_comms = n()
+  ) %>%
+  arrange(desc(num_comms)) %>%
+  head(10) %>%
+  ggplot(aes(x = num_comms, y = destination_IP)) +
+  geom_col() +
+  ggtitle("Number of Communications by Destination IP on 4/6") +
+  ## modified labels from Julien on stack overflow on 10/16/16 at https://stackoverflow.com/questions/40072971/how-to-change-scientific-notation-on-legend-labels-in-ggplot2 ----
+  scale_x_continuous("Number of Communications", labels = comma)+
+## --------------------
+  scale_y_discrete("Destination IP Address of Communications") +
+  theme(panel.grid = element_blank(), panel.background = element_rect(fill = "white"), axis.line = element_line(color = "black"))
+  
+```
+
+```{r}
+firewall_0407 %>%
+  group_by(destination_IP) %>%
+  summarize(
+    num_comms = n()
+  ) %>%
+  arrange(desc(num_comms)) %>%
+  head(10) %>%
+  ggplot(aes(x = num_comms, y = destination_IP)) +
+  geom_col() +
+  ggtitle("Number of Communications by Destination IP on 4/7") +
+  ## modified labels from Julien on stack overflow on 10/16/16 at https://stackoverflow.com/questions/40072971/how-to-change-scientific-notation-on-legend-labels-in-ggplot2 ----
+  scale_x_continuous("Number of Communications", labels = comma)+
+## --------------------
+  scale_y_discrete("Destination IP Address of Communications") +
+  theme(panel.grid = element_blank(), panel.background = element_rect(fill = "white"), axis.line = element_line(color = "black"))
+```
+
+## destination port
+
+```{r}
+firewall_0406 %>%
+  group_by(destination_port) %>%
+  summarize(
+    num_comms = n()
+  ) %>%
+  arrange(desc(num_comms)) %>%
+  head(10) %>%
+  ggplot(aes(x = num_comms, y = destination_port)) +
+  geom_col() +
+  ggtitle("Number of Communications by Destination Port on 4/6") +
+  ## modified labels from Julien on stack overflow on 10/16/16 at https://stackoverflow.com/questions/40072971/how-to-change-scientific-notation-on-legend-labels-in-ggplot2 ----
+  scale_x_continuous("Number of Communications", labels = comma, trans = "log")+
+## --------------------
+  scale_y_discrete("Destination Port of Communications") +
+  theme(panel.grid = element_blank(), panel.background = element_rect(fill = "white"), axis.line = element_line(color = "black"))
+  
+```
+
+```{r}
+firewall_0407 %>%
+  group_by(destination_port) %>%
+  summarize(
+    num_comms = n()
+  ) %>%
+  arrange(desc(num_comms)) %>%
+  head(10) %>%
+  ggplot(aes(x = num_comms, y = destination_port)) +
+  geom_col() +
+  ggtitle("Number of Communications by Destination Port on 4/7") +
+  ## modified labels from Julien on stack overflow on 10/16/16 at https://stackoverflow.com/questions/40072971/how-to-change-scientific-notation-on-legend-labels-in-ggplot2 ----
+  scale_x_continuous("Number of Communications", labels = comma, trans = "log")+
+## --------------------
+  scale_y_discrete("Destination Port of Communications") +
+  theme(panel.grid = element_blank(), panel.background = element_rect(fill = "white"), axis.line = element_line(color = "black"))
+```
 
 
 
