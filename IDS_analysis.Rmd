@@ -186,6 +186,111 @@ ids0407 %>%
 ```
 
 
+```{r}
+IDS %>%
+  group_by(destIP) %>%
+  summarize(
+    num_comms = n()
+  ) %>%
+  arrange(desc(num_comms))
+```
+
+```{r}
+ids0407 %>%
+  group_by(destIP) %>%
+  summarize(
+    num_comms = n()
+  ) %>%
+  arrange(desc(num_comms))
+```
+
+```{r}
+IDS %>%
+  group_by(sourceIP) %>%
+  summarize(
+    num_comms = n()
+  ) %>%
+  arrange(desc(num_comms))
+```
+
+```{r}
+ids0407 %>%
+  group_by(sourceIP) %>%
+  summarize(
+    num_comms = n()
+  ) %>%
+  arrange(desc(num_comms))
+```
+
+```{r}
+IDS %>%
+  filter(priority == 1) %>%
+  group_by(sourceIP) %>%
+  summarize(
+    num_comms = n()
+  ) %>%
+  arrange(desc(num_comms))
+```
+
+```{r}
+ids0407 %>%
+  filter(priority == 1) %>%
+  group_by(sourceIP) %>%
+  summarize(
+    num_comms = n()
+  ) %>%
+  arrange(desc(num_comms)) %>%
+  head(10) %>%
+  ggplot(aes(x = num_comms, y = sourceIP)) +
+  geom_col() +
+  ggtitle("Number of Communications Marked with Priority 1 on 4/7") +
+  scale_x_continuous("Number of Communications", breaks = c(0,3,6,9,12), labels = c("0", "3", "6", "9", "12")) +
+  scale_y_discrete("Source IP") +
+  theme(panel.grid = element_blank(), panel.background = element_rect(fill = "white"), axis.line = element_line(color = "black"))
+```
+
+```{r}
+IDS %>%
+  group_by(priority, classification) %>%
+  summarize(
+    num_comms = n()
+  ) %>%
+  arrange(desc(num_comms))
+```
+
+
+```{r}
+ids0407 %>%
+  group_by(priority, classification) %>%
+  summarize(
+    num_comms = n()
+  ) %>%
+  arrange(desc(num_comms))
+```
+```{r}
+IDS %>%
+  filter(priority == 1) %>%
+  group_by(destPort) %>%
+  summarize(
+    num_comms = n()
+  ) %>%
+  arrange(desc(num_comms))
+```
+
+```{r}
+ids0407 %>%
+  group_by(sourceIP, xref, destPort) %>%
+  summarize(
+    n = n()
+  )
+```
+
+
+
+
+
+
+
 
 
 
