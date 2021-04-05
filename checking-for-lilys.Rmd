@@ -1,0 +1,102 @@
+---
+title: "analysis-of-lilys-IP"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(plotly)
+library(lubridate)
+```
+
+# Analyzing Lily's IP 172.23.5.110
+
+
+### April 6
+
+```{r, warning = FALSE, message = FALSE}
+## read CSV into R
+
+firewall_0406_original <- read_csv("Firewall-04062012.csv") 
+```
+
+```{r}
+## rename columns and parse date/time to aid analysis
+
+firewall_0406 <- firewall_0406_original %>%
+  mutate(date_time = dmy_hms(`Date/time`)) %>%
+  rename(syslog_priority = `Syslog priority`) %>%
+  rename(operation = Operation) %>%
+  rename(message_code = `Message code`) %>%
+  rename(protocol = Protocol) %>%
+  rename(source_IP = `Source IP`) %>%
+  rename(destination_IP = `Destination IP`) %>%
+  rename(source_hostname = `Source hostname`) %>%
+  rename(destination_hostname = `Destination hostname`) %>%
+  rename(source_port = `Source port`) %>%
+  rename(destination_port = `Destination port`) %>%
+  rename(destination_service = `Destination service`) %>%
+  rename(direction = Direction) %>%
+  rename(connections_built = `Connections built`) %>%
+  rename(connections_torn_down = `Connections torn down`)
+```
+
+
+```{r}
+firewall_0406 %>%
+  filter(source_IP == "172.23.5.110")
+
+firewall_0406 %>%
+  filter(destination_IP == "172.23.5.110")
+```
+  
+
+
+```{r, warning = FALSE, message = FALSE}
+## read CSV into R
+
+firewall_0407_original <- read_csv("Firewall-04072012.csv") 
+```
+
+```{r}
+## rename columns and parse date/time to aid analysis
+
+firewall_0407 <- firewall_0407_original %>%
+  mutate(date_time = dmy_hms(`Date/time`)) %>%
+  rename(syslog_priority = `Syslog priority`) %>%
+  rename(operation = Operation) %>%
+  rename(message_code = `Message code`) %>%
+  rename(protocol = Protocol) %>%
+  rename(source_IP = `Source IP`) %>%
+  rename(destination_IP = `Destination IP`) %>%
+  rename(source_hostname = `Source hostname`) %>%
+  rename(destination_hostname = `Destination hostname`) %>%
+  rename(source_port = `Source port`) %>%
+  rename(destination_port = `Destination port`) %>%
+  rename(destination_service = `Destination service`) %>%
+  rename(direction = Direction) %>%
+  rename(connections_built = `Connections built`) %>%
+  rename(connections_torn_down = `Connections torn down`)
+```
+
+
+```{r}
+firewall_0407 %>%
+  filter(source_IP == "172.23.5.110")
+
+firewall_0407 %>%
+  filter(destination_IP == "172.23.5.110")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
