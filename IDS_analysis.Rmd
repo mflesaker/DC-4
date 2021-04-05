@@ -1,6 +1,6 @@
 ---
 title: "IDS_analysis"
-author: "Lily Diao"
+author: "Lily Diao & Michelle Flesaker"
 date: "3/28/2021"
 output: html_document
 ---
